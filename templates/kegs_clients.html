@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Долги по кегам{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>💰 Долги по кегам</h1>
+    <p>Кто должен вернуть кеги</p>
+</div>
+
+<div class="actions">
+    <a href="/kegs" class="btn">← К операциям</a>
+    <a href="/export/kegs_clients" class="btn">📤 Скачать в Excel</a>
+</div>
+
+<div class="kpi-grid-2">
+    <div class="kpi {% if total_debt > 0 %}kpi-red{% else %}kpi-green{% endif %}">
+        <div class="kpi-label">⚠️ Всего кег в долгу</div>
+        <div class="kpi-value">{{ total_debt }}</div>
+    </div>
+    <div class="kpi {% if total_debt_sum > 0 %}kpi-red{% else %}kpi-green{% endif %}">
+        <div class="kpi-label">💸 Сумма долга</div>
+        <div class="kpi-value">{{ '{:,.0f}'.format(total_debt_sum) }} ₽</div>
+        <div class="kpi-hint">Стоимость кеги: {{ '{:,.0f}'.format(keg_price) }} ₽</div>
+    </div>
+</div>
+
+{% if result %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Клиент</th>
+            <th>Телефон</th>
+            <th>Выдано</th>
+            <th>Возвращено</th>
+            <th>Долг</th>
+            <th>Сумма долга</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in result %}
+        <tr>
+            <td><strong>{{ loop.index }}</strong></td>
+            <td>
+                <a href="/clients/{{ r.client.id }}" style="color: #667eea;">
+                    {{ r.client.name }}
+                </a>
+            </td>
+            <td>{{ r.client.phone or '—' }}</td>
+            <td>{{ r.issued }}</td>
+            <td>{{ r.returned }}</td>
+            <td>
+                {% if r.debt > 0 %}
+                    <strong style="color: #c62828;">{{ r.debt }}</strong>
+                {% else %}
+                    <span style="color: #4caf50;">0 ✅</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if r.debt_sum > 0 %}
+                    <strong style="color: #c62828;">{{ '{:,.0f}'.format(r.debt_sum) }} ₽</strong>
+                {% else %}
+                    <span style="color: #4caf50;">0 ₽</span>
+                {% endif %}
+            </td>
+            <td>
+                <a href="/kegs/add?client_id={{ r.client.id }}" class="btn btn-sm btn-primary">➕ Вернул</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <p>Долгов по кегам нет. Все молодцы! ✅</p>
+    <a href="/kegs" class="btn">← К операциям</a>
+</div>
+{% endif %}
+{% endblock %}

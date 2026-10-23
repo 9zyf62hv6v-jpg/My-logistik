@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Заказы — Моя Логистика{% endblock %}
+
+{% block content %}
+<style>
+    .order-checkbox, #selectAll {
+        width: 22px !important;
+        height: 22px !important;
+        cursor: pointer;
+        accent-color: #667eea;
+    }
+    .data-table th:first-child,
+    .data-table td:first-child {
+        text-align: center;
+        padding: 8px;
+    }
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        margin-top: 25px;
+        flex-wrap: wrap;
+    }
+    .pagination a,
+    .pagination span {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        background: white;
+        color: #333;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        font-size: 14px;
+    }
+    .pagination a:hover { background: #667eea; color: white; }
+    .pagination .active { background: #667eea; color: white; font-weight: bold; }
+    .pagination .disabled { background: #f0f0f0; color: #bbb; }
+    .pagination .dots { background: transparent; box-shadow: none; color: #888; }
+    .pagination-info {
+        text-align: center;
+        color: #888;
+        font-size: 14px;
+        margin-top: 10px;
+    }
+    .per-page-selector {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        margin-left: auto;
+    }
+    .per-page-selector a {
+        padding: 4px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        color: #666;
+        font-size: 13px;
+        background: #f0f0f0;
+    }
+    .per-page-selector a.active {
+        background: #667eea;
+        color: white;
+    }
+</style>
+
+<div class="page-header">
+    <h1>📦 Заказы</h1>
+    <p>Показано: <b>{{ stats.показано }}</b> из {{ stats.всего }}</p>
+</div>
+
+<div class="actions">
+    <a href="/orders/add" class="btn btn-primary">➕ Добавить заказ</a>
+    <a href="/import" class="btn">📥 Импорт из Excel</a>
+    <a href="/export/orders?{{ request.query_string.decode() }}" class="btn">📤 Скачать в Excel</a>
+</div>
+
+<div class="card" style="padding: 20px;">
+    <h2 style="font-size: 16px; margin-bottom: 15px; padding-bottom: 10px;">🔍 Фильтры</h2>
+    <form method="GET" action="/orders">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end;">
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Поиск (№ или клиент)</label>
+                <input type="text" name="search" value="{{ current_search }}" placeholder="№ заказа или имя">
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Статус</label>
+                <select name="status">
+                    <option value="">— Все —</option>
+                    <option value="Новый" {% if current_filter == 'Новый' %}selected{% endif %}>🆕 Новый</option>
+                    <option value="В работе" {% if current_filter == 'В работе' %}selected{% endif %}>🔧 В работе</option>
+                    <option value="Доставлен" {% if current_filter == 'Доставлен' %}selected{% endif %}>✅ Доставлен</option>
+                    <option value="Отменён" {% if current_filter == 'Отменён' %}selected{% endif %}>❌ Отменён</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Клиент</label>
+                <select name="client_id">
+                    <option value="">— Все —</option>
+                    {% for c in clients %}
+                    <option value="{{ c.id }}" {% if current_client == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Маршрут</label>
+                <select name="route_id">
+                    <option value="">— Все —</option>
+                    <option value="none" {% if current_route == 'none' %}selected{% endif %}>❌ Без маршрута</option>
+                    {% for r in routes %}
+                    <option value="{{ r.id }}" {% if current_route == r.id|string %}selected{% endif %}>
+                        #{{ r.id }} — {{ r.driver.name if r.driver else '—' }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Дата с</label>
+                <input type="date" name="date_from" value="{{ current_date_from }}">
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Дата по</label>
+                <input type="date" name="date_to" value="{{ current_date_to }}">
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button type="submit" class="btn btn-primary">🔍 Применить</button>
+                <a href="/orders" class="btn">✖ Сброс</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="filters" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <a href="/orders" class="filter-btn {% if not current_filter and not current_route %}filter-active{% endif %}">
+        Все ({{ stats.всего }})
+    </a>
+    <a href="/orders?status=Новый" class="filter-btn {% if current_filter == 'Новый' %}filter-active{% endif %}">
+        🆕 Новый ({{ stats['Новый'] }})
+    </a>
+    <a href="/orders?status=В работе" class="filter-btn {% if current_filter == 'В работе' %}filter-active{% endif %}">
+        🔧 В работе ({{ stats['В работе'] }})
+    </a>
+    <a href="/orders?status=Доставлен" class="filter-btn {% if current_filter == 'Доставлен' %}filter-active{% endif %}">
+        ✅ Доставлен ({{ stats['Доставлен'] }})
+    </a>
+    <a href="/orders?route_id=none" class="filter-btn {% if current_route == 'none' %}filter-active{% endif %}">
+        ⚠️ Без маршрута ({{ stats['без маршрута'] }})
+    </a>
+    
+    <div class="per-page-selector">
+        <span style="color: #888; font-size: 13px;">Показывать:</span>
+        <a href="?per_page=25{% if current_filter %}&status={{ current_filter }}{% endif %}{% if current_route %}&route_id={{ current_route }}{% endif %}"
+           class="{% if per_page == 25 %}active{% endif %}">25</a>
+        <a href="?per_page=50{% if current_filter %}&status={{ current_filter }}{% endif %}{% if current_route %}&route_id={{ current_route }}{% endif %}"
+           class="{% if per_page == 50 %}active{% endif %}">50</a>
+        <a href="?per_page=100{% if current_filter %}&status={{ current_filter }}{% endif %}{% if current_route %}&route_id={{ current_route }}{% endif %}"
+           class="{% if per_page == 100 %}active{% endif %}">100</a>
+        <a href="?per_page=200{% if current_filter %}&status={{ current_filter }}{% endif %}{% if current_route %}&route_id={{ current_route }}{% endif %}"
+           class="{% if per_page == 200 %}active{% endif %}">200</a>
+    </div>
+</div>
+
+<form id="massForm" method="POST" action="/orders/mass_action">
+    
+    <div id="massPanel" class="card" style="display: none; background: #f0f4ff; border-left: 4px solid #667eea; position: sticky; top: 10px; z-index: 100;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <b style="font-size: 16px;">Выбрано: <span id="selectedCount">0</span></b>
+            <select name="action" id="actionSelect" required style="padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                <option value="">— Действие —</option>
+                <option value="change_status">🔄 Изменить статус</option>
+                <option value="add_to_route">🗺 Добавить в маршрут</option>
+                <option value="remove_from_route">❌ Убрать из маршрута</option>
+                <option value="delete">🗑 Удалить</option>
+            </select>
+            <select name="new_status" id="statusSelect" style="display: none; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                <option value="Новый">🆕 Новый</option>
+                <option value="В работе">🔧 В работе</option>
+                <option value="Доставлен">✅ Доставлен</option>
+                <option value="Отменён">❌ Отменён</option>
+            </select>
+            <select name="route_id" id="routeSelect" style="display: none; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                <option value="">— Маршрут —</option>
+                {% for r in routes %}
+                <option value="{{ r.id }}">
+                    #{{ r.id }} — {{ r.driver.name if r.driver else '—' }}
+                </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">✅ Применить</button>
+            <button type="button" class="btn" onclick="clearSelection();">✖ Снять выбор</button>
+        </div>
+    </div>
+    
+    {% if orders %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" id="selectAll" onclick="toggleAll(this);">
+                </th>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Клиент</th>
+                <th>Сумма</th>
+                <th>Статус</th>
+                <th>Маршрут</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>
+                    <input type="checkbox" name="order_ids" value="{{ order.id }}"
+                           class="order-checkbox" onclick="updateCount();">
+                </td>
+                <td><strong>#{{ order.id }}</strong></td>
+                <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '—' }}</td>
+                <td>{{ order.client.name if order.client else '—' }}</td>
+                <td><strong>{{ '{:,.0f}'.format(order.amount) }} ₽</strong></td>
+                <td>
+                    <span class="status status-{{ order.status|replace(' ', '-')|lower }}">
+                        {{ order.status }}
+                    </span>
+                </td>
+                <td>
+                    {% if order.route_id %}
+                        <a href="/routes/{{ order.route_id }}" style="color: #667eea;">#{{ order.route_id }}</a>
+                    {% else %}
+                        <span style="color: #ef6c00; font-size: 13px;">без маршрута</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/orders/{{ order.id }}" class="btn btn-sm">👁</a>
+                    <a href="/orders/{{ order.id }}/edit" class="btn btn-sm">✏️</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>Заказов по фильтрам не найдено.</p>
+        <a href="/orders" class="btn">Сбросить фильтры</a>
+    </div>
+    {% endif %}
+    
+</form>
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+    {% if pagination.has_prev %}
+        <a href="{{ url_for('orders', page=pagination.prev_num, status=current_filter, client_id=current_client, date_from=current_date_from, date_to=current_date_to, search=current_search, route_id=current_route, per_page=per_page) }}">← Назад</a>
+    {% else %}
+        <span class="disabled">← Назад</span>
+    {% endif %}
+    
+    {% set start_page = [1, pagination.page - 2] | max %}
+    {% set end_page = [pagination.pages, pagination.page + 2] | min %}
+    
+    {% if start_page > 1 %}
+        <a href="{{ url_for('orders', page=1, status=current_filter, client_id=current_client, date_from=current_date_from, date_to=current_date_to, search=current_search, route_id=current_route, per_page=per_page) }}">1</a>
+        {% if start_page > 2 %}<span class="dots">...</span>{% endif %}
+    {% endif %}
+    
+    {% for p in range(start_page, end_page + 1) %}
+        {% if p == pagination.page %}
+            <span class="active">{{ p }}</span>
+        {% else %}
+            <a href="{{ url_for('orders', page=p, status=current_filter, client_id=current_client, date_from=current_date_from, date_to=current_date_to, search=current_search, route_id=current_route, per_page=per_page) }}">{{ p }}</a>
+        {% endif %}
+    {% endfor %}
+    
+    {% if end_page < pagination.pages %}
+        {% if end_page < pagination.pages - 1 %}<span class="dots">...</span>{% endif %}
+        <a href="{{ url_for('orders', page=pagination.pages, status=current_filter, client_id=current_client, date_from=current_date_from, date_to=current_date_to, search=current_search, route_id=current_route, per_page=per_page) }}">{{ pagination.pages }}</a>
+    {% endif %}
+    
+    {% if pagination.has_next %}
+        <a href="{{ url_for('orders', page=pagination.next_num, status=current_filter, client_id=current_client, date_from=current_date_from, date_to=current_date_to, search=current_search, route_id=current_route, per_page=per_page) }}">Вперёд →</a>
+    {% else %}
+        <span class="disabled">Вперёд →</span>
+    {% endif %}
+</div>
+
+<div class="pagination-info">
+    Страница {{ pagination.page }} из {{ pagination.pages }} • 
+    Показано {{ orders|length }} из {{ pagination.total }} заказов
+</div>
+{% endif %}
+
+<script>
+function toggleAll(checkbox) {
+    var checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = checkbox.checked; });
+    updateCount();
+}
+function updateCount() {
+    var checked = document.querySelectorAll('.order-checkbox:checked');
+    var count = checked.length;
+    document.getElementById('selectedCount').textContent = count;
+    document.getElementById('massPanel').style.display = count > 0 ? 'block' : 'none';
+    var all = document.querySelectorAll('.order-checkbox');
+    var selectAll = document.getElementById('selectAll');
+    if (all.length > 0) selectAll.checked = (count === all.length);
+}
+function clearSelection() {
+    document.querySelectorAll('.order-checkbox').forEach(function(cb) { cb.checked = false; });
+    document.getElementById('selectAll').checked = false;
+    updateCount();
+}
+document.getElementById('actionSelect').addEventListener('change', function() {
+    var action = this.value;
+    var statusSelect = document.getElementById('statusSelect');
+    var routeSelect = document.getElementById('routeSelect');
+    statusSelect.style.display = 'none';
+    routeSelect.style.display = 'none';
+    statusSelect.required = false;
+    routeSelect.required = false;
+    if (action === 'change_status') { statusSelect.style.display = 'block'; statusSelect.required = true; }
+    else if (action === 'add_to_route') { routeSelect.style.display = 'block'; routeSelect.required = true; }
+});
+document.getElementById('massForm').addEventListener('submit', function(e) {
+    var checked = document.querySelectorAll('.order-checkbox:checked');
+    if (checked.length === 0) { e.preventDefault(); alert('Выберите хотя бы один заказ!'); return false; }
+    var action = document.getElementById('actionSelect').value;
+    if (!action) { e.preventDefault(); alert('Выберите действие!'); return false; }
+    if (action === 'delete') { if (!confirm('Удалить ' + checked.length + ' заказов? Это необратимо!')) { e.preventDefault(); return false; } }
+});
+document.addEventListener('DOMContentLoaded', function() { updateCount(); });
+</script>
+
+{% endblock %}

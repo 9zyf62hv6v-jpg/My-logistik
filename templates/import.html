@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Импорт из Excel{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>📥 Импорт из Excel</h1>
+    <p>Загрузите файл с клиентами — система создаст заказы и добавит новых клиентов</p>
+</div>
+
+<div class="card">
+    <h2>📋 Как это работает</h2>
+    <ol style="padding-left: 25px; line-height: 2;">
+        <li>Загружаете файл <b>.xls</b> или <b>.xlsx</b> с колонками:
+            <ul style="padding-left: 25px;">
+                <li><b>A:</b> Имя клиента</li>
+                <li><b>B:</b> Адрес</li>
+                <li><b>C:</b> Сумма заказа</li>
+            </ul>
+        </li>
+        <li>Система проверяет каждого клиента:
+            <ul style="padding-left: 25px;">
+                <li><b>Есть в базе?</b> → использует существующего</li>
+                <li><b>Нет?</b> → создаёт нового</li>
+            </ul>
+        </li>
+        <li>Создаёт <b>заказ</b> на каждого клиента с суммой из файла</li>
+        <li><b>Проверяет дубли:</b> если такой же заказ (клиент + сумма + дата) уже есть — пропускает</li>
+        <li>Показывает отчёт: сколько клиентов, заказов, пропущено дублей</li>
+    </ol>
+</div>
+
+<div class="card">
+    <h2>📤 Загрузить файл</h2>
+    <form method="POST" enctype="multipart/form-data" class="form">
+        <div class="form-group">
+            <label>Файл Excel (.xls или .xlsx) *</label>
+            <input type="file" name="file" accept=".xls,.xlsx" required
+                   style="padding: 10px; border: 2px dashed #667eea; background: #f8f9ff;">
+        </div>
+
+        <div class="form-group">
+            <label>Дата заказов</label>
+            <input type="date" name="order_date" value="{{ today }}">
+        </div>
+
+        <div class="form-group" style="background: #fff8e1; padding: 15px; border-radius: 8px; border-left: 4px solid #ff9800;">
+            <label style="display: flex; align-items: center; cursor: pointer; font-weight: normal;">
+                <input type="checkbox" name="ignore_duplicates" style="width: auto; margin-right: 10px;">
+                <span><b>⚠️ Игнорировать защиту от дублей</b><br>
+                <small style="color: #666;">Поставь галочку, если нужно принудительно загрузить файл повторно. Все заказы создадутся заново.</small></span>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" style="font-size: 16px; padding: 14px 30px;">
+                📥 Загрузить и импортировать
+            </button>
+            <a href="/orders" class="btn">← К заказам</a>
+        </div>
+    </form>
+</div>
+
+{% if history %}
+<div class="card">
+    <h2>📜 История импортов</h2>
+    <form action="/import/clear_history" method="POST" style="margin-bottom: 15px;">
+        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Очистить историю?');">
+            🗑 Очистить историю
+        </button>
+    </form>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Дата импорта</th>
+                <th>Файл</th>
+                <th>Дата заказов</th>
+                <th>Клиентов новых</th>
+                <th>Заказов создано</th>
+                <th>Пропущено</th>
+                <th>Сумма</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in history %}
+            <tr>
+                <td>{{ h.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td>{{ h.filename }}</td>
+                <td>{{ h.order_date.strftime('%d.%m.%Y') if h.order_date else '—' }}</td>
+                <td>{{ h.clients_created }}</td>
+                <td>{{ h.orders_created }}</td>
+                <td>
+                    {% if h.orders_skipped > 0 %}
+                        <span style="color: #ef6c00;"><b>{{ h.orders_skipped }}</b></span>
+                    {% else %}
+                        0
+                    {% endif %}
+                </td>
+                <td><strong>{{ '{:,.0f}'.format(h.total_amount) }} ₽</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div class="card">
+    <h2>⚠️ Важно знать</h2>
+    <ul style="padding-left: 25px; line-height: 2;">
+        <li><b>Дубли клиентов не создаются.</b> Если клиент уже в базе (даже с другим написанием ИП/ООО) — система его найдёт.</li>
+        <li><b>Дубли заказов не создаются.</b> Если такой же заказ (клиент + сумма + дата) уже есть — он пропускается.</li>
+        <li><b>Повторная загрузка того же файла</b> на ту же дату — блокируется автоматически.</li>
+        <li><b>Все заказы получают статус «Новый».</b> Дальше назначайте их в маршруты.</li>
+      </ul>
+</div>
+
+{% endblock %}

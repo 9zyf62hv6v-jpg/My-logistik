@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Клиенты без координат — Моя Логистика</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f5f6f8; }
+    header { background: #1f4e79; color: #fff; padding: 12px 20px; }
+    header a { color: #fff; margin-right: 16px; text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    .wrap { display: flex; gap: 16px; padding: 16px; }
+    .list { flex: 0 0 380px; background: #fff; border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 12px;
+            max-height: 80vh; overflow: auto; }
+    .list h3 { margin: 0 0 10px; }
+    .item { padding: 10px; border-bottom: 1px solid #eee; }
+    .item.active { background: #e8f1fb; }
+    .item b { display: block; margin-bottom: 4px; }
+    .item small { color: #666; }
+    .item button { margin-top: 6px; margin-right: 6px; font-size: 12px;
+                   padding: 4px 8px; cursor: pointer; }
+    .map-wrap { flex: 1; }
+    #map { height: 80vh; border-radius: 8px; }
+    .row { display: flex; gap: 8px; margin-top: 8px; }
+    .row input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+    .row button { padding: 6px 12px; cursor: pointer; background: #1f4e79;
+                  color: #fff; border: 0; border-radius: 4px; }
+    .flash { padding: 8px 12px; background: #d4edda; color: #155724;
+             border-radius: 4px; margin: 0 16px 8px; }
+    .empty { color: #888; font-style: italic; padding: 20px; text-align: center; }
+  </style>
+</head>
+<body>
+<header>
+  <a href="/">← На главную</a>
+  <a href="/clients">Клиенты</a>
+  <a href="/orders">Заказы</a>
+  <strong style="float:right;">Клиенты без координат</strong>
+</header>
+
+{% with msgs = get_flashed_messages() %}
+  {% if msgs %}
+    {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="wrap">
+  <div class="list">
+    <h3>Без координат: {{ clients|length }}</h3>
+
+    <form method="post" action="/clients/no_coords/geocode_all" style="margin-bottom:12px;">
+      <button type="submit">🌍 Геокодировать всех (DaData)</button>
+    </form>
+
+    {% if clients %}
+      {% for c in clients %}
+        <div class="item" data-id="{{ c.id }}"
+             data-address="{{ c.address or '' }}">
+          <b>{{ c.name }}</b>
+          <small>{{ c.address or '— адрес не указан —' }}</small>
+          <div class="row">
+            <input type="text" class="addr-input"
+                   value="{{ c.address or '' }}"
+                   placeholder="Уточните адрес">
+            <button type="button" class="btn-find">🔎 Найти</button>
+          </div>
+          <div class="row">
+            <input type="text" class="lat-input" placeholder="lat">
+            <input type="text" class="lon-input" placeholder="lon">
+            <button type="button" class="btn-save"
+                    data-id="{{ c.id }}">💾</button>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">Все клиенты с координатами 🎉</div>
+    {% endif %}
+  </div>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // Карта по умолчанию — центр Волжского
+  const map = L.map('map').setView([48.785, 44.775], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  let marker = null;
+  let activeItem = null;
+
+  function setMarker(lat, lon) {
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([lat, lon]).addTo(map);
+    map.setView([lat, lon], 16);
+  }
+
+  // Клик по карте — ставим точку и заполняем поля активного клиента
+  map.on('click', (e) => {
+    const { lat, lng } = e.latlng;
+    setMarker(lat, lng);
+    if (activeItem) {
+      activeItem.querySelector('.lat-input').value = lat.toFixed(6);
+      activeItem.querySelector('.lon-input').value = lng.toFixed(6);
+    }
+  });
+
+  document.querySelectorAll('.item').forEach(item => {
+    item.addEventListener('click', (ev) => {
+      if (ev.target.tagName === 'BUTTON' || ev.target.tagName === 'INPUT') return;
+      document.querySelectorAll('.item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      activeItem = item;
+      const lat = parseFloat(item.querySelector('.lat-input').value);
+      const lon = parseFloat(item.querySelector('.lon-input').value);
+      if (!isNaN(lat) && !isNaN(lon)) setMarker(lat, lon);
+    });
+
+    // «Найти» через DaData
+    item.querySelector('.btn-find').addEventListener('click', async () => {
+      const addr = item.querySelector('.addr-input').value.trim();
+      if (!addr) { alert('Укажите адрес'); return; }
+      const r = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({address: addr})
+      });
+      const data = await r.json();
+      if (data.ok) {
+        item.querySelector('.lat-input').value = data.lat.toFixed(6);
+        item.querySelector('.lon-input').value = data.lon.toFixed(6);
+        setMarker(data.lat, data.lon);
+      } else {
+        alert('Не удалось найти: ' + (data.error || 'неизвестная ошибка'));
+      }
+    });
+
+    // «Сохранить»
+    item.querySelector('.btn-save').addEventListener('click', async () => {
+      const id  = item.dataset.id;
+      const lat = parseFloat(item.querySelector('.lat-input').value);
+      const lon = parseFloat(item.querySelector('.lon-input').value);
+      if (isNaN(lat) || isNaN(lon)) { alert('Нужны координаты'); return; }
+      const r = await fetch('/api/clients/' + id + '/coords', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({lat, lon})
+      });
+      const data = await r.json();
+      if (data.ok) {
+        item.style.opacity = 0.4;
+        item.querySelector('.btn-save').textContent = '✓';
+      } else {
+        alert('Ошибка сохранения');
+      }
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование маршрута #{{ route.id }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>✏️ Маршрут #{{ route.id }}</h1>
+</div>
+
+<form method="POST" class="form">
+    <div class="form-group">
+        <label>Водитель *</label>
+        <select name="driver_id" required>
+            {% for driver in drivers %}
+            <option value="{{ driver.id }}" {% if driver.id == route.driver_id %}selected{% endif %}>
+                {{ driver.name }} — {{ driver.vehicle or 'без машины' }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Дата</label>
+        <input type="date" name="route_date" value="{{ route.route_date.strftime('%Y-%m-%d') if route.route_date else '' }}">
+    </div>
+
+    <div class="form-group">
+        <label>Статус</label>
+        <select name="status">
+            <option value="Новый" {% if route.status == 'Новый' %}selected{% endif %}>🆕 Новый</option>
+            <option value="В работе" {% if route.status == 'В работе' %}selected{% endif %}>🔧 В работе</option>
+            <option value="Выполнен" {% if route.status == 'Выполнен' %}selected{% endif %}>✅ Выполнен</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Комментарий</label>
+        <textarea name="comment" rows="3">{{ route.comment or '' }}</textarea>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+        <a href="/routes/{{ route.id }}" class="btn">Отмена</a>
+    </div>
+</form>
+{% endblock %}

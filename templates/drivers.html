@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Водители — Моя Логистика{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🚚 Водители</h1>
+    <p>Всего: {{ drivers|length }}</p>
+</div>
+
+<div class="actions">
+    <a href="/drivers/add" class="btn btn-primary">➕ Добавить водителя</a>
+</div>
+
+{% if drivers %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Имя</th>
+            <th>Телефон</th>
+            <th>Машина</th>
+            <th>Статус</th>
+            <th>Маршрутов</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for driver in drivers %}
+        <tr>
+            <td><strong>{{ driver.name }}</strong></td>
+            <td>{{ driver.phone or '—' }}</td>
+            <td>{{ driver.vehicle or '—' }}</td>
+            <td>
+                <span class="status status-{{ driver.status|lower }}">
+                    {{ driver.status }}
+                </span>
+            </td>
+            <td>{{ driver.routes|length }}</td>
+            <td>
+                <a href="/drivers/{{ driver.id }}" class="btn btn-sm">👁</a>
+                <a href="/drivers/{{ driver.id }}/edit" class="btn btn-sm">✏️</a>
+                <form action="/drivers/{{ driver.id }}/delete" method="POST" style="display:inline;" onsubmit="return confirm('Удалить водителя?');">
+                    <button type="submit" class="btn btn-sm btn-danger">🗑</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <p>Водителей пока нет.</p>
+    <a href="/drivers/add" class="btn btn-primary">Добавить первого водителя</a>
+</div>
+{% endif %}
+{% endblock %}

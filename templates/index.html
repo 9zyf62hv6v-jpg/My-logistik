@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Главная — Моя Логистика{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🚚 Моя Логистика</h1>
+    <p>Система управления логистикой пивзавода</p>
+</div>
+
+<div class="cards-grid">
+    <a href="/clients" class="card-link">
+        <div class="card">
+            <div class="card-icon">👥</div>
+            <div class="card-title">Клиенты</div>
+            <div class="card-value">{{ clients_count }}</div>
+            <div class="card-desc">всего в базе</div>
+        </div>
+    </a>
+
+    <a href="/orders" class="card-link">
+        <div class="card">
+            <div class="card-icon">📦</div>
+            <div class="card-title">Заказы</div>
+            <div class="card-value">{{ orders_count }}</div>
+            <div class="card-desc">всего в базе</div>
+        </div>
+    </a>
+
+    <a href="/drivers" class="card-link">
+        <div class="card">
+            <div class="card-icon">🚚</div>
+            <div class="card-title">Водители</div>
+            <div class="card-value">{{ drivers_count }}</div>
+            <div class="card-desc">всего в базе</div>
+        </div>
+    </a>
+
+    <a href="/routes" class="card-link">
+        <div class="card">
+            <div class="card-icon">🗺</div>
+            <div class="card-title">Маршруты</div>
+            <div class="card-value">{{ routes_count }}</div>
+            <div class="card-desc">всего в базе</div>
+        </div>
+    </a>
+
+    <a href="/kegs" class="card-link">
+        <div class="card">
+            <div class="card-icon">🥁</div>
+            <div class="card-title">Кеги</div>
+            <div class="card-value" style="{% if keg_debt_total > 0 %}color: #c62828;{% else %}color: #2e7d32;{% endif %}">
+                {{ keg_debt_total }}
+            </div>
+            <div class="card-desc">в долгу (шт)</div>
+        </div>
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование — {{ client.name }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<div class="page-header">
+    <h1>✏️ Редактирование клиента</h1>
+</div>
+
+<form method="POST" class="form" id="client-form">
+    <div class="form-group">
+        <label>Имя клиента *</label>
+        <input type="text" name="name" value="{{ client.name }}" required>
+    </div>
+
+    <div class="form-group">
+        <label>Адрес</label>
+        <div style="display: flex; gap: 8px;">
+            <input type="text" name="address" id="address-input"
+                   value="{{ client.address or '' }}" style="flex: 1;">
+            <button type="button" id="btn-find"
+                    class="btn btn-primary" style="white-space: nowrap;">
+                🔎 Найти
+            </button>
+        </div>
+        <small id="find-status" style="color: #666; display: block; margin-top: 4px;"></small>
+    </div>
+
+    <div class="form-group">
+        <label>Телефон</label>
+        <input type="text" name="phone" value="{{ client.phone or '' }}">
+    </div>
+
+    <div class="form-group">
+        <label>Контактное лицо</label>
+        <input type="text" name="contact_person" value="{{ client.contact_person or '' }}">
+    </div>
+
+    <div class="form-group">
+        <label>Группа ABC</label>
+        <select name="group_abc">
+            <option value="A" {% if client.group_abc == 'A' %}selected{% endif %}>A — важный</option>
+            <option value="B" {% if client.group_abc == 'B' %}selected{% endif %}>B — средний</option>
+            <option value="C" {% if client.group_abc == 'C' %}selected{% endif %}>C — обычный</option>
+        </select>
+    </div>
+
+    <div class="form-group" style="background: #f0f4ff; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;">
+        <label style="font-weight: 600;">📍 Координаты для карты</label>
+        <p style="color: #666; font-size: 13px; margin: 5px 0 10px;">
+            Кнопка «🔎 Найти» подтянет координаты из адреса.
+            Клик по карте или перетаскивание метки — точная настройка.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div>
+                <small style="color: #888;">Широта (lat)</small>
+                <input type="text" name="lat" id="lat-input"
+                       value="{{ client.lat if client.lat is not none else '' }}"
+                       placeholder="48.712345">
+            </div>
+            <div>
+                <small style="color: #888;">Долгота (lon)</small>
+                <input type="text" name="lon" id="lon-input"
+                       value="{{ client.lon if client.lon is not none else '' }}"
+                       placeholder="44.512345">
+            </div>
+        </div>
+
+        <div id="map" style="height: 300px; border-radius: 8px; border: 1px solid #ccd;"></div>
+        <small style="color: #888; display: block; margin-top: 6px;">
+            Метку можно перетаскивать мышью. Клик по карте = переставить метку.
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label>Комментарий</label>
+        <textarea name="comment" rows="3">{{ client.comment or '' }}</textarea>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+        <a href="/clients/{{ client.id }}" class="btn">Отмена</a>
+    </div>
+</form>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+    const DEFAULT_CENTER = [48.785, 44.775]; // Волжский
+    const DEFAULT_ZOOM = 12;
+
+    const addressInput = document.getElementById('address-input');
+    const latInput     = document.getElementById('lat-input');
+    const lonInput     = document.getElementById('lon-input');
+    const btnFind      = document.getElementById('btn-find');
+    const findStatus   = document.getElementById('find-status');
+
+    const initialLat = parseFloat(latInput.value);
+    const initialLon = parseFloat(lonInput.value);
+    const hasInitial = !isNaN(initialLat) && !isNaN(initialLon);
+
+    const map = L.map('map').setView(
+        hasInitial ? [initialLat, initialLon] : DEFAULT_CENTER,
+        hasInitial ? 16 : DEFAULT_ZOOM
+    );
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let marker = null;
+
+    function setMarker(lat, lon, panTo) {
+        if (marker) {
+            marker.setLatLng([lat, lon]);
+        } else {
+            marker = L.marker([lat, lon], { draggable: true }).addTo(map);
+            marker.on('dragend', function (e) {
+                const p = e.target.getLatLng();
+                latInput.value = p.lat.toFixed(6);
+                lonInput.value = p.lng.toFixed(6);
+            });
+        }
+        if (panTo) {
+            map.setView([lat, lon], 16);
+        }
+    }
+
+    // Если координаты уже есть — сразу показываем метку
+    if (hasInitial) {
+        setMarker(initialLat, initialLon, false);
+    }
+
+    map.on('click', function (e) {
+        const lat = e.latlng.lat;
+        const lon = e.latlng.lng;
+        latInput.value = lat.toFixed(6);
+        lonInput.value = lon.toFixed(6);
+        setMarker(lat, lon, false);
+    });
+
+    function syncMarkerFromInputs() {
+        const lat = parseFloat(latInput.value);
+        const lon = parseFloat(lonInput.value);
+        if (!isNaN(lat) && !isNaN(lon)) {
+            setMarker(lat, lon, false);
+        }
+    }
+    latInput.addEventListener('change', syncMarkerFromInputs);
+    lonInput.addEventListener('change', syncMarkerFromInputs);
+
+    btnFind.addEventListener('click', async function () {
+        const addr = addressInput.value.trim();
+        if (!addr) {
+            findStatus.textContent = '⚠️ Сначала введите адрес';
+            findStatus.style.color = '#c0392b';
+            return;
+        }
+        btnFind.disabled = true;
+        btnFind.textContent = '⏳ Ищем...';
+        findStatus.textContent = '';
+        try {
+            const r = await fetch('/api/geocode', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({address: addr})
+            });
+            const data = await r.json();
+            if (data.ok) {
+                latInput.value = data.lat.toFixed(6);
+                lonInput.value = data.lon.toFixed(6);
+                setMarker(data.lat, data.lon, true);
+                findStatus.textContent = '✅ Найдено: ' + (data.address || addr);
+                findStatus.style.color = '#2e7d32';
+            } else {
+                findStatus.textContent = '❌ ' + (data.error || 'Не найдено. Поставьте точку на карте вручную.');
+                findStatus.style.color = '#c0392b';
+            }
+        } catch (e) {
+            findStatus.textContent = '❌ Ошибка сети: ' + e.message;
+            findStatus.style.color = '#c0392b';
+        } finally {
+            btnFind.disabled = false;
+            btnFind.textContent = '🔎 Найти';
+        }
+    });
+})();
+</script>
+{% endblock %}

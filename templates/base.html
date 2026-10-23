@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Моя Логистика{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🚚 Моя Логистика</a>
+            <div class="nav-links">
+                <a href="/clients">👥 Клиенты</a>
+                <a href="/orders">📦 Заказы</a>
+                <a href="/drivers">🚚 Водители</a>
+                <a href="/routes">🗺 Маршруты</a>
+                <a href="/kegs">🥁 Кеги</a>
+                <a href="/import">📥 Импорт</a>
+                <a href="/dashboard">📊 Дашборд</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Маршрут №{{ route.id }}</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            padding: 12px;
+            padding-bottom: 100px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 20px; margin-bottom: 4px; }
+        .header p { font-size: 13px; opacity: 0.9; }
+        .progress-badge {
+            background: rgba(255,255,255,0.25);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        #map {
+            height: 350px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            z-index: 1;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .nav-btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .nav-btn-yandex { background: #fc3f1d; color: white; }
+        .nav-btn-maps { background: #27ae60; color: white; }
+        .status-panel {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            font-size: 13px;
+        }
+        .status-panel > div { flex: 1; }
+        .status-panel .num {
+            font-size: 20px;
+            font-weight: 700;
+            display: block;
+            margin-top: 3px;
+        }
+        .status-panel .num.waiting { color: #ef6c00; }
+        .status-panel .num.done { color: #4caf50; }
+        .order-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            border-left: 5px solid #e0e0e0;
+        }
+        .order-card.delivered { border-left-color: #4caf50; background: #f8fff8; }
+        .order-card.problem { border-left-color: #f44336; background: #fff8f8; }
+        .order-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+        .order-card.delivered .order-number { background: #4caf50; }
+        .order-card.problem .order-number { background: #f44336; }
+        .client-name { font-size: 17px; font-weight: 600; color: #333; margin-bottom: 6px; line-height: 1.3; }
+        .client-address { font-size: 14px; color: #666; margin-bottom: 6px; line-height: 1.4; }
+        .client-phone { font-size: 14px; margin-bottom: 10px; }
+        .client-phone a { color: #667eea; text-decoration: none; font-weight: 600; }
+        .order-amount { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 12px; }
+        .order-comment {
+            font-size: 12px;
+            color: #888;
+            font-style: italic;
+            margin-bottom: 10px;
+            padding: 6px 10px;
+            background: #f8f9ff;
+            border-radius: 6px;
+        }
+        .order-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-action {
+            flex: 1;
+            min-width: 120px;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-done { background: #4caf50; color: white; }
+        .btn-problem { background: #fff3e0; color: #ef6c00; }
+        .btn-reset { background: #f0f0f0; color: #666; font-size: 13px; padding: 10px; }
+        .bottom-bar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: white;
+            padding: 12px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+        .bottom-bar a, .bottom-bar button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .btn-back { background: #f0f0f0; color: #333; }
+        .btn-finish { background: #667eea; color: white; }
+        .empty {
+            text-align: center;
+            padding: 40px 20px;
+            background: white;
+            border-radius: 12px;
+            color: #888;
+        }
+        .modal-bg {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 9998;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-bg.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .modal h3 { margin-bottom: 15px; font-size: 18px; }
+        .modal textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+        .modal-buttons { display: flex; gap: 10px; }
+        .custom-marker {
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .custom-marker.delivered { background: #4caf50; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>Маршрут №{{ route.id }}</h1>
+        <p>{{ route.route_date.strftime('%d.%m.%Y') if route.route_date else '—' }}</p>
+    </div>
+    <div class="progress-badge">{{ done }} / {{ total }}</div>
+</div>
+
+{% if points %}
+<div id="map"></div>
+<div class="nav-buttons">
+    <a href="#" id="yandexNavBtn" class="nav-btn nav-btn-yandex" target="_blank">🧭 Яндекс.Навигатор</a>
+    <a href="#" id="yandexMapsBtn" class="nav-btn nav-btn-maps" target="_blank">🗺 Яндекс.Карты</a>
+</div>
+{% else %}
+<div class="empty">
+    <p>⚠️ У клиентов в маршруте нет координат.</p>
+    <p style="margin-top: 8px; font-size: 13px;">
+        Запусти <b>python geocode.py</b>, чтобы найти координаты.
+    </p>
+</div>
+{% endif %}
+
+<div class="status-panel">
+    <div>Всего точек<span class="num">{{ total }}</span></div>
+    <div>Ожидают<span class="num waiting">{{ waiting }}</span></div>
+    <div>Доставлено<span class="num done">{{ done }}</span></div>
+</div>
+
+{% if route.orders %}
+    {% for order in route.orders %}
+    <div class="order-card{% if order.status == 'Доставлен' %} delivered{% endif %}{% if order.comment and 'ПРОБЛЕМА' in order.comment %} problem{% endif %}">
+        <div class="order-number">№{{ order.id }}</div>
+        <div class="client-name">{{ order.client.name if order.client else '—' }}</div>
+        {% if order.client and order.client.address %}
+        <div class="client-address">📍 {{ order.client.address }}</div>
+        {% endif %}
+        {% if order.client and order.client.phone %}
+        <div class="client-phone">📞 <a href="tel:{{ order.client.phone }}">{{ order.client.phone }}</a></div>
+        {% endif %}
+        <div class="order-amount">💰 {{ '{:,.0f}'.format(order.amount) }} ₽</div>
+        {% if order.comment %}
+        <div class="order-comment">{{ order.comment }}</div>
+        {% endif %}
+        {% if order.status == 'Доставлен' %}
+            <form action="/driver/order/{{ order.id }}/reset" method="POST" style="margin:0;">
+                <button type="submit" class="btn-action btn-reset" style="width:100%;">🔄 Отменить (вернуть в работу)</button>
+            </form>
+        {% else %}
+            <div class="order-actions">
+                <form action="/driver/order/{{ order.id }}/done" method="POST" style="flex:1;margin:0;">
+                    <button type="submit" class="btn-action btn-done" style="width:100%;">✅ Доставлено</button>
+                </form>
+                <button type="button" class="btn-action btn-problem" onclick="showProblem({{ order.id }});">⚠️ Проблема</button>
+            </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+<div class="empty"><p>В маршруте нет заказов.</p></div>
+{% endif %}
+
+<div class="bottom-bar">
+    <a href="/driver/{{ route.driver_id }}" class="btn-back">← Назад</a>
+    <form action="/driver/route/{{ route.id }}/finish" method="POST" style="flex:1;margin:0;"
+          onsubmit="return confirm('Завершить маршрут?');">
+        <button type="submit" class="btn-finish" style="width:100%;">🎉 Завершить маршрут</button>
+    </form>
+</div>
+
+<div id="problemModal" class="modal-bg">
+    <div class="modal">
+        <h3>⚠️ Что случилось?</h3>
+        <form id="problemForm" method="POST">
+            <textarea name="comment" rows="4" placeholder="Опишите проблему..."></textarea>
+            <div class="modal-buttons">
+                <button type="submit" class="btn-action btn-problem" style="flex:1;">📝 Отправить</button>
+                <button type="button" class="btn-action" style="flex:1; background:#f0f0f0; color:#333;" onclick="closeProblem();">Отмена</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var points = {{ points | tojson }};
+
+var map = L.map('map').setView([48.708, 44.513], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19,
+}).addTo(map);
+
+var bounds = [];
+points.forEach(function(p) {
+    var icon = L.divIcon({
+        className: '',
+        html: '<div class="custom-marker' + (p.status === 'Доставлен' ? ' delivered' : '') + '">' + p.num + '</div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+    });
+    var marker = L.marker([p.lat, p.lon], { icon: icon }).addTo(map);
+    var popupHtml = '<b>' + p.num + '. ' + p.name + '</b><br>📍 ' + p.address + '<br>💰 ' + p.amount + ' ₽';
+    marker.bindPopup(popupHtml);
+    bounds.push([p.lat, p.lon]);
+});
+
+if (bounds.length > 0) {
+    map.fitBounds(bounds, { padding: [30, 30] });
+}
+
+// Яндекс.Навигатор (для водителя — режим ведения по точкам)
+if (points.length > 0) {
+    var coordsNav = points.map(function(p) { return p.lon + ',' + p.lat; }).join('~');
+    document.getElementById('yandexNavBtn').href = 'https://yandex.ru/navi/?rtext=' + coordsNav + '&rtt=auto';
+
+    var coordsMaps = points.map(function(p) { return p.lat + ',' + p.lon; }).join('~');
+    document.getElementById('yandexMapsBtn').href = 'https://yandex.ru/maps/?rtext=' + coordsMaps + '&rtt=auto&mode=routes';
+}
+
+function showProblem(orderId) {
+    document.getElementById('problemForm').action = '/driver/order/' + orderId + '/problem';
+    document.getElementById('problemModal').classList.add('active');
+}
+function closeProblem() {
+    document.getElementById('problemModal').classList.remove('active');
+}
+</script>
+
+</body>
+</html>

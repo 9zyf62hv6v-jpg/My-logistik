@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Дашборд{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 Дашборд</h1>
+    <p>Обзор логистики на текущий момент</p>
+</div>
+
+<div class="actions">
+    <a href="/export/dashboard" class="btn btn-primary">📤 Скачать отчёт в Excel</a>
+</div>
+
+<div class="kpi-grid">
+    <div class="kpi">
+        <div class="kpi-label">👥 Клиенты</div>
+        <div class="kpi-value">{{ stats.clients }}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">📦 Заказы</div>
+        <div class="kpi-value">{{ stats.orders }}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">🚚 Водители</div>
+        <div class="kpi-value">{{ stats.drivers }}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">🗺 Маршруты</div>
+        <div class="kpi-value">{{ stats.routes }}</div>
+    </div>
+</div>
+
+<div class="kpi-grid-2">
+    <div class="kpi kpi-green">
+        <div class="kpi-label">💰 Общая сумма заказов</div>
+        <div class="kpi-value">{{ '{:,.0f}'.format(total_amount) }} ₽</div>
+    </div>
+    <div class="kpi {% if free_orders_count > 0 %}kpi-red{% else %}kpi-green{% endif %}">
+        <div class="kpi-label">⚠️ Заказы без маршрута</div>
+        <div class="kpi-value">{{ free_orders_count }}</div>
+        <div class="kpi-hint">
+            {% if free_orders_count > 0 %}
+                <a href="/orders?route_id=none">Назначить →</a>
+            {% else %}
+                Все распределены ✅
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ГРАФИКИ -->
+<!-- ============================================================ -->
+
+<div class="card">
+    <h2>📈 Продажи за последние 30 дней</h2>
+    <div style="height: 320px;">
+        <canvas id="salesChart"></canvas>
+    </div>
+</div>
+
+<div class="two-cols">
+
+    <div class="card">
+        <h2>🥧 Заказы по статусам</h2>
+        <div style="height: 280px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="statusChart" style="max-height: 280px;"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🏆 Топ-5 клиентов</h2>
+        <div style="height: 280px;">
+            <canvas id="clientsChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<div class="card">
+    <h2>🚚 Выручка по водителям</h2>
+    <div style="height: 280px;">
+        <canvas id="driversChart"></canvas>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ТАБЛИЦЫ -->
+<!-- ============================================================ -->
+
+<div class="card">
+    <h2>📦 Заказы по статусам</h2>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Статус</th>
+                <th>Количество</th>
+                <th>Сумма</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="status status-новый">🆕 Новый</span></td>
+                <td><strong>{{ orders_by_status['Новый'] }}</strong></td>
+                <td>{{ '{:,.0f}'.format(sums_by_status['Новый']) }} ₽</td>
+            </tr>
+            <tr>
+                <td><span class="status status-в-работе">🔧 В работе</span></td>
+                <td><strong>{{ orders_by_status['В работе'] }}</strong></td>
+                <td>{{ '{:,.0f}'.format(sums_by_status['В работе']) }} ₽</td>
+            </tr>
+            <tr>
+                <td><span class="status status-доставлен">✅ Доставлен</span></td>
+                <td><strong>{{ orders_by_status['Доставлен'] }}</strong></td>
+                <td>{{ '{:,.0f}'.format(sums_by_status['Доставлен']) }} ₽</td>
+            </tr>
+            <tr>
+                <td><span class="status status-отменён">❌ Отменён</span></td>
+                <td><strong>{{ orders_by_status['Отменён'] }}</strong></td>
+                <td>{{ '{:,.0f}'.format(sums_by_status['Отменён']) }} ₽</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>🕐 Последние 10 заказов</h2>
+    {% if recent_orders %}
+    <table class="data-table">
+        <thead>
+            <tr><th>№</th><th>Дата</th><th>Клиент</th><th>Сумма</th><th>Статус</th><th>Маршрут</th></tr>
+        </thead>
+        <tbody>
+            {% for order in recent_orders %}
+            <tr>
+                <td><a href="/orders/{{ order.id }}"><strong>#{{ order.id }}</strong></a></td>
+                <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '—' }}</td>
+                <td>{{ order.client.name if order.client else '—' }}</td>
+                <td>{{ '{:,.0f}'.format(order.amount) }} ₽</td>
+                <td><span class="status status-{{ order.status|replace(' ', '-')|lower }}">{{ order.status }}</span></td>
+                <td>
+                    {% if order.route_id %}
+                        <a href="/routes/{{ order.route_id }}">#{{ order.route_id }}</a>
+                    {% else %}
+                        <span style="color: #ef6c00;">без маршрута</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #888;">Заказов пока нет.</p>
+    {% endif %}
+</div>
+
+<!-- ============================================================ -->
+<!-- CHART.JS -->
+<!-- ============================================================ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+// ============================================================
+// 1. ГРАФИК ПРОДАЖ ЗА 30 ДНЕЙ
+// ============================================================
+var salesCtx = document.getElementById('salesChart').getContext('2d');
+new Chart(salesCtx, {
+    type: 'line',
+    data: {
+        labels: {{ chart_dates | tojson }},
+        datasets: [{
+            label: 'Продажи, ₽',
+            data: {{ chart_sales | tojson }},
+            borderColor: '#667eea',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#667eea',
+            pointRadius: 3,
+            pointHoverRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' ₽';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        if (value >= 1000000) return (value/1000000).toFixed(1) + ' млн';
+                        if (value >= 1000) return (value/1000).toFixed(0) + ' тыс';
+                        return value;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// ============================================================
+// 2. КРУГОВАЯ — СТАТУСЫ
+// ============================================================
+var statusCtx = document.getElementById('statusChart').getContext('2d');
+new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ chart_status_labels | tojson }},
+        datasets: [{
+            data: {{ chart_status_values | tojson }},
+            backgroundColor: [
+                '#2196F3',  // Новый — синий
+                '#FF9800',  // В работе — оранжевый
+                '#4CAF50',  // Доставлен — зелёный
+                '#F44336',  // Отменён — красный
+            ],
+            borderWidth: 2,
+            borderColor: '#fff',
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 15,
+                    font: { size: 13 }
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        var total = context.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                        var percent = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                        return context.label + ': ' + context.parsed + ' (' + percent + '%)';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// ============================================================
+// 3. ТОП-5 КЛИЕНТОВ — СТОЛБИКИ
+// ============================================================
+var clientsCtx = document.getElementById('clientsChart').getContext('2d');
+new Chart(clientsCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ chart_clients_labels | tojson }},
+        datasets: [{
+            label: 'Сумма, ₽',
+            data: {{ chart_clients_values | tojson }},
+            backgroundColor: '#4CAF50',
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return new Intl.NumberFormat('ru-RU').format(context.parsed.x) + ' ₽';
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        if (value >= 1000000) return (value/1000000).toFixed(1) + ' млн';
+                        if (value >= 1000) return (value/1000).toFixed(0) + ' тыс';
+                        return value;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// ============================================================
+// 4. ВЫРУЧКА ПО ВОДИТЕЛЯМ — СТОЛБИКИ
+// ============================================================
+var driversCtx = document.getElementById('driversChart').getContext('2d');
+new Chart(driversCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ chart_drivers_labels | tojson }},
+        datasets: [{
+            label: 'Сумма, ₽',
+            data: {{ chart_drivers_values | tojson }},
+            backgroundColor: '#667eea',
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' ₽';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        if (value >= 1000000) return (value/1000000).toFixed(1) + ' млн';
+                        if (value >= 1000) return (value/1000).toFixed(0) + ' тыс';
+                        return value;
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+
+{% endblock %}

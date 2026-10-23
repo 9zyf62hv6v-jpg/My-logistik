@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Маршрут #{{ route.id }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🗺 Маршрут #{{ route.id }}</h1>
+    <p>
+        <span class="status status-{{ route.status|replace(' ', '-')|lower }}">{{ route.status }}</span>
+    </p>
+</div>
+
+<div class="actions">
+    <a href="/routes/{{ route.id }}/print" class="btn btn-primary" target="_blank">🖨 Печать</a>
+    <a href="/export/route/{{ route.id }}" class="btn">📤 Скачать в Excel</a>
+    <a href="/routes/{{ route.id }}/edit" class="btn">✏️ Редактировать</a>
+    <a href="/routes" class="btn">← К списку</a>
+</div>
+
+<div class="info-block">
+    <div class="info-row">
+        <span class="info-label">Водитель:</span>
+        <span><a href="/drivers/{{ route.driver.id }}">{{ route.driver.name }}</a></span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Телефон:</span>
+        <span>{{ route.driver.phone or '—' }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Машина:</span>
+        <span>{{ route.driver.vehicle or '—' }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Дата:</span>
+        <span>{{ route.route_date.strftime('%d.%m.%Y') if route.route_date else '—' }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Комментарий:</span>
+        <span>{{ route.comment or '—' }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Заказов:</span>
+        <span><strong>{{ route.orders|length }}</strong> на сумму <strong>{{ '{:,.0f}'.format(route.orders|sum(attribute='amount')) }} ₽</strong></span>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📦 Заказы в маршруте</h2>
+    {% if route.orders %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Клиент</th>
+                <th>Адрес</th>
+                <th>Сумма</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in route.orders %}
+            <tr>
+                <td><strong>#{{ order.id }}</strong></td>
+                <td>{{ order.client.name }}</td>
+                <td>{{ order.client.address or '—' }}</td>
+                <td>{{ '{:,.0f}'.format(order.amount) }} ₽</td>
+                <td>
+                    <form action="/routes/{{ route.id }}/remove_order/{{ order.id }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-danger">Убрать</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #888;">В маршруте пока нет заказов.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>📦 Свободные заказы (без маршрута)</h2>
+    {% if free_orders %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Клиент</th>
+                <th>Дата доставки</th>
+                <th>Сумма</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in free_orders %}
+            <tr>
+                <td><strong>#{{ order.id }}</strong></td>
+                <td>{{ order.client.name }}</td>
+                <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '—' }}</td>
+                <td>{{ '{:,.0f}'.format(order.amount) }} ₽</td>
+                <td>
+                    <form action="/routes/{{ route.id }}/add_order/{{ order.id }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-primary">➕ Добавить</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #888;">Нет свободных заказов. Все заказы уже в маршрутах.</p>
+    {% endif %}
+</div>
+{% endblock %}

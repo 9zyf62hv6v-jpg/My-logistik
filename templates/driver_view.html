@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ driver.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🚚 {{ driver.name }}</h1>
+    <p>
+        <span class="status status-{{ driver.status|lower }}">{{ driver.status }}</span>
+    </p>
+</div>
+
+<div class="info-block">
+    <div class="info-row">
+        <span class="info-label">Телефон:</span>
+        <span>{{ driver.phone or '—' }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Машина:</span>
+        <span>{{ driver.vehicle or '—' }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Комментарий:</span>
+        <span>{{ driver.comment or '—' }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Добавлен:</span>
+        <span>{{ driver.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🗺 Маршруты водителя</h2>
+    {% if driver.routes %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Заказов</th>
+                <th>Статус</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in driver.routes %}
+            <tr>
+                <td><strong>#{{ r.id }}</strong></td>
+                <td>{{ r.route_date.strftime('%d.%m.%Y') }}</td>
+                <td>{{ r.orders|length }}</td>
+                <td><span class="status status-{{ r.status|replace(' ', '-')|lower }}">{{ r.status }}</span></td>
+                <td><a href="/routes/{{ r.id }}" class="btn btn-sm">👁</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #888;">Маршрутов пока нет.</p>
+    {% endif %}
+</div>
+
+<div class="actions">
+    <a href="/drivers/{{ driver.id }}/edit" class="btn btn-primary">✏️ Редактировать</a>
+    <a href="/drivers" class="btn">← К списку</a>
+</div>
+{% endblock %}

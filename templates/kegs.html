@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Кеги — Моя Логистика{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🥁 Кеги</h1>
+    <p>Учёт возвратной тары</p>
+</div>
+
+<div class="actions">
+    <a href="/kegs/add" class="btn btn-primary">➕ Добавить операцию</a>
+    <a href="/kegs/clients" class="btn">💰 Долги по клиентам</a>
+    <a href="/export/kegs?{{ request.query_string.decode() }}" class="btn">📤 Скачать в Excel</a>
+</div>
+
+<div class="kpi-grid">
+    <div class="kpi">
+        <div class="kpi-label">📦 Выдано кег</div>
+        <div class="kpi-value">{{ stats['Выдано'] }}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">📥 Возвращено кег</div>
+        <div class="kpi-value">{{ stats['Возвращено'] }}</div>
+    </div>
+    <div class="kpi {% if stats['Долг'] > 0 %}kpi-red{% else %}kpi-green{% endif %}">
+        <div class="kpi-label">⚠️ Долг (кег)</div>
+        <div class="kpi-value">{{ stats['Долг'] }}</div>
+    </div>
+    <div class="kpi {% if stats['Долг'] > 0 %}kpi-red{% else %}kpi-green{% endif %}">
+        <div class="kpi-label">💸 Сумма долга</div>
+        <div class="kpi-value">{{ '{:,.0f}'.format(stats['Сумма долга (₽)']) }} ₽</div>
+    </div>
+</div>
+
+<div class="card" style="padding: 20px;">
+    <h2 style="font-size: 16px; margin-bottom: 15px; padding-bottom: 10px;">🔍 Фильтры</h2>
+    <form method="GET" action="/kegs">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end;">
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Тип операции</label>
+                <select name="type">
+                    <option value="">— Все —</option>
+                    <option value="Выдано" {% if current_type == 'Выдано' %}selected{% endif %}>📦 Выдано</option>
+                    <option value="Возвращено" {% if current_type == 'Возвращено' %}selected{% endif %}>📥 Возвращено</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Клиент</label>
+                <select name="client_id">
+                    <option value="">— Все —</option>
+                    {% for c in clients %}
+                    <option value="{{ c.id }}" {% if current_client == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Дата с</label>
+                <input type="date" name="date_from" value="{{ current_date_from }}">
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label style="font-size: 13px;">Дата по</label>
+                <input type="date" name="date_to" value="{{ current_date_to }}">
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button type="submit" class="btn btn-primary">🔍 Применить</button>
+                <a href="/kegs" class="btn">✖ Сброс</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% if kegs %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>№</th>
+            <th>Дата</th>
+            <th>Клиент</th>
+            <th>Операция</th>
+            <th>Количество</th>
+            <th>Комментарий</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for keg in kegs %}
+        <tr>
+            <td><strong>#{{ keg.id }}</strong></td>
+            <td>{{ keg.operation_date.strftime('%d.%m.%Y') if keg.operation_date else '—' }}</td>
+            <td>{{ keg.client.name if keg.client else '—' }}</td>
+            <td>
+                {% if keg.operation_type == 'Выдано' %}
+                    <span class="status status-новый">📦 Выдано</span>
+                {% else %}
+                    <span class="status status-доставлен">📥 Возвращено</span>
+                {% endif %}
+            </td>
+            <td><strong>{{ keg.quantity }}</strong></td>
+            <td>{{ keg.comment or '—' }}</td>
+            <td>
+                <form action="/kegs/{{ keg.id }}/delete" method="POST" style="display:inline;" onsubmit="return confirm('Удалить операцию?');">
+                    <button type="submit" class="btn btn-sm btn-danger">🗑</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <p>Операций пока нет.</p>
+    <a href="/kegs/add" class="btn btn-primary">Добавить первую операцию</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дашборд — Заправки автопарка</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --accent: #667EEA;
+  --accent-dark: #5568d3;
+  --success: #48BB78;
+  --warning: #ED8936;
+  --danger: #F56565;
+  --purple: #9F7AEA;
+  --teal: #38B2AC;
+  --yellow: #ECC94B;
+  --bg: #F7FAFC;
+  --card: #FFFFFF;
+  --text: #2D3748;
+  --text-muted: #718096;
+  --border: #E2E8F0;
+  --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.06), 0 12px 32px rgba(0,0,0,0.1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+/* ============== TOPBAR ============== */
+.topbar {
+  background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+  color: #fff;
+  padding: 20px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 20px rgba(102,126,234,0.25);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.brand { display: flex; align-items: center; gap: 16px; }
+.logo {
+  width: 52px; height: 52px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  backdrop-filter: blur(10px);
+}
+.brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.brand p { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+.actions { display: flex; align-items: center; gap: 16px; }
+.file-name {
+  font-size: 13px;
+  opacity: 0.85;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  font-family: inherit;
+}
+.btn-primary {
+  background: #fff;
+  color: var(--accent);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+}
+.btn-large { padding: 14px 28px; font-size: 16px; }
+
+/* ============== MAIN ============== */
+main {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+/* ============== EMPTY STATE ============== */
+.empty-state {
+  background: var(--card);
+  border: 2px dashed var(--border);
+  border-radius: 20px;
+  padding: 80px 40px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.empty-state.drag-over {
+  border-color: var(--accent);
+  background: #F0F4FF;
+  transform: scale(1.01);
+}
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+.empty-state h2 {
+  font-size: 22px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.empty-state p {
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+.empty-state code {
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+/* ============== KPI ============== */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.kpi {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+.kpi::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px; height: 100%;
+  background: var(--accent);
+}
+.kpi.success::before { background: var(--success); }
+.kpi.warning::before { background: var(--warning); }
+.kpi.danger::before { background: var(--danger); }
+.kpi.purple::before { background: var(--purple); }
+.kpi:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+.kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+.kpi-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ============== CHARTS ============== */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+.card-wide { grid-column: 1 / -1; }
+.card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.card .hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 18px;
+}
+.chart-wrap {
+  position: relative;
+  height: 320px;
+}
+.chart-wrap.tall { height: 400px; }
+.chart-wrap.short { height: 260px; }
+
+/* ============== CHART CONTROLS ============== */
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0 18px;
+}
+.toggle-group {
+  display: inline-flex;
+  background: #EDF2F7;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 2px;
+}
+.toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.toggle-btn:hover { color: var(--text); }
+.toggle-btn.active {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.driver-toggles {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.driver-toggles-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.btn-mini {
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.btn-mini:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #F0F4FF;
+}
+.driver-checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.driver-cb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  user-select: none;
+}
+.driver-cb:hover { background: #F7FAFC; }
+.driver-cb input { display: none; }
+.driver-cb .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.driver-cb input:not(:checked) ~ .swatch { opacity: 0.25; }
+.driver-cb input:not(:checked) ~ .name { opacity: 0.4; }
+
+/* ============== TABLE ============== */
+.table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+thead {
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+}
+th {
+  text-align: left;
+  padding: 14px 18px;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+th:hover { background: #EDF2F7; }
+th.num, td.num { text-align: right; }
+tbody tr { transition: background 0.15s; }
+tbody tr:hover { background: #F0F4FF; }
+tbody tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
+td { padding: 12px 18px; }
+td:first-child { font-weight: 600; }
+.rank {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 24px;
+  text-align: center;
+  margin-right: 10px;
+}
+.rank.gold { background: linear-gradient(135deg, #F6AD55, #DD6B20); }
+.rank.silver { background: linear-gradient(135deg, #A0AEC0, #718096); }
+.rank.bronze { background: linear-gradient(135deg, #D69E2E, #975A16); }
+.name-cell { display: flex; align-items: center; }
+.badge-na {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #FED7D7;
+  color: #9B2C2C;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+/* ============== RESPONSIVE ============== */
+@media (max-width: 1200px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  main { padding: 20px; }
+  .topbar { padding: 16px 20px; }
+  .brand h1 { font-size: 17px; }
+  .file-name { display: none; }
+}
+@media (max-width: 560px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .kpi-value { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">⛽</div>
+    <div>
+      <h1>Дашборд руководителя</h1>
+      <p>Аналитика по заправкам автопарка</p>
+    </div>
+  </div>
+  <div class="actions">
+    <span class="file-name" id="fileName"></span>
+    <label class="btn btn-primary">
+      📂 Открыть отчёт
+      <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+    </label>
+  </div>
+</header>
+
+<main>
+  <!-- Пустой стейт -->
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">📊</div>
+    <h2>Загрузите отчёт по заправкам</h2>
+    <p>Перетащите сюда файл <code>Отчет_заправки_*.xlsx</code> или нажмите кнопку ниже</p>
+    <label class="btn btn-primary btn-large">
+      📂 Выбрать файл
+      <input type="file" id="fileInput2" accept=".xlsx,.xls" hidden>
+    </label>
+  </div>
+
+  <!-- Дашборд -->
+  <div id="dashboard" hidden>
+
+    <!-- KPI -->
+    <section class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Всего литров</div>
+        <div class="kpi-value" id="kpiLitres">—</div>
+        <div class="kpi-sub" id="kpiLitresSub"></div>
+      </div>
+      <div class="kpi success">
+        <div class="kpi-label">Всего заправок</div>
+        <div class="kpi-value" id="kpiFills">—</div>
+        <div class="kpi-sub" id="kpiFillsSub"></div>
+      </div>
+      <div class="kpi purple">
+        <div class="kpi-label">Всего затрат</div>
+        <div class="kpi-value" id="kpiSum">—</div>
+        <div class="kpi-sub" id="kpiSumSub"></div>
+      </div>
+      <div class="kpi warning">
+        <div class="kpi-label">Средняя цена литра</div>
+        <div class="kpi-value" id="kpiPrice">—</div>
+        <div class="kpi-sub">по всем заправкам</div>
+      </div>
+      <div class="kpi danger">
+        <div class="kpi-label">Без водителя</div>
+        <div class="kpi-value" id="kpiNoDriver">—</div>
+        <div class="kpi-sub" id="kpiNoDriverSub"></div>
+      </div>
+    </section>
+
+    <!-- Динамика по месяцам -->
+    <section class="charts-grid">
+      <div class="card card-wide">
+        <h3>Динамика по месяцам <span class="hint" id="periodHint"></span></h3>
+
+        <div class="chart-controls">
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-mode="total">Суммарно</button>
+            <button class="toggle-btn" data-mode="drivers">По водителям</button>
+          </div>
+
+          <div class="driver-toggles" id="driverToggles" hidden>
+            <div class="driver-toggles-actions">
+              <button class="btn-mini" id="btnAllDrivers">Все</button>
+              <button class="btn-mini" id="btnTopDrivers">Топ-6</button>
+              <button class="btn-mini" id="btnNoneDrivers">Ничего</button>
+            </div>
+            <div class="driver-checkbox-grid" id="driverCheckboxes"></div>
+          </div>
+        </div>
+
+        <div class="chart-wrap tall">
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Топ водителей + Дни недели -->
+    <section class="charts-grid">
+      <div class="card">
+        <h3>Топ-10 водителей</h3>
+        <p class="hint">По общему объёму заправок, литров</p>
+        <div class="chart-wrap tall">
+          <canvas id="driversChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Активность по дням недели</h3>
+        <p class="hint">Суммарные литры по каждому дню недели</p>
+        <div class="chart-wrap tall">
+          <canvas id="weekdayChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Пирог + Scatter -->
+    <section class="charts-grid">
+      <div class="card">
+        <h3>Распределение литров</h3>
+        <p class="hint">Доля каждого водителя в общем объёме</p>
+        <div class="chart-wrap">
+          <canvas id="pieChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Стиль заправок водителей</h3>
+        <p class="hint">Количество заправок (X) × средний объём одной заправки (Y)</p>
+        <div class="chart-wrap">
+          <canvas id="scatterChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Таблица -->
+    <section class="card">
+      <h3>Детально по водителям</h3>
+      <p class="hint">Кликните на заголовок столбца, чтобы отсортировать</p>
+      <div class="table-wrap">
+        <table id="driversTable">
+          <thead>
+            <tr>
+              <th data-sort="name">Водитель</th>
+              <th data-sort="litres" class="num">Литров</th>
+              <th data-sort="fills" class="num">Заправок</th>
+              <th data-sort="avg" class="num">Средний объём</th>
+              <th data-sort="sum" class="num">Сумма (₽)</th>
+              <th data-sort="price" class="num">Цена литра (₽)</th>
+              <th data-sort="share" class="num">Доля</th>
+            </tr>
+          </thead>
+          <tbody id="driversTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<script>
+// ============================================================
+// СОСТОЯНИЕ
+// ============================================================
+const state = {
+  drivers: [],
+  daily: [],
+  allFills: [],
+  sortKey: 'litres',
+  sortDir: 'desc',
+  charts: {},
+  monthlyMode: 'total',       // 'total' | 'drivers'
+  selectedDrivers: new Set(), // какие водители показаны в режиме "по водителям"
+  driverColors: new Map(),    // имя → цвет (стабильный)
+};
+
+// Палитра для линий по водителям (13+ различимых цветов)
+const DRIVER_PALETTE = [
+  '#667EEA', // индиго
+  '#48BB78', // зелёный
+  '#ED8936', // оранжевый
+  '#F56565', // красный
+  '#9F7AEA', // фиолетовый
+  '#38B2AC', // бирюзовый
+  '#ECC94B', // жёлтый
+  '#4299E1', // голубой
+  '#ED64A6', // розовый
+  '#A0AEC0', // серый
+  '#DD6B20', // тёмно-оранжевый
+  '#805AD5', // тёмно-фиолетовый
+  '#2F855A', // тёмно-зелёный
+  '#C53030', // тёмно-красный
+  '#B83280', // малиновый
+];
+
+// ============================================================
+// УТИЛИТЫ
+// ============================================================
+function parseNum(v) {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const n = parseFloat(v.replace(/\s/g, '').replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+  }
+  return 0;
+}
+
+function parseDate(v) {
+  if (v instanceof Date) return v;
+  if (typeof v === 'number') {
+    const epoch = Date.UTC(1899, 11, 30);
+    return new Date(epoch + v * 86400000);
+  }
+  if (typeof v === 'string') {
+    const m = v.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+    if (m) return new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0));
+    const d = new Date(v);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
+function fmtInt(n) { return Math.round(n).toLocaleString('ru-RU'); }
+function fmtNum(n, dec = 1) {
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function fmtMoney(n) { return Math.round(n).toLocaleString('ru-RU') + ' ₽'; }
+function fmtDate(d) { return d.toLocaleDateString('ru-RU'); }
+function fmtMonth(d) {
+  const months = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  return months[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function monthKey(d) { return d.getFullYear() * 100 + (d.getMonth() + 1); }
+
+// Присваиваем водителям цвета детерминированно (по алфавиту)
+function assignDriverColors() {
+  state.driverColors.clear();
+  const names = state.drivers
+    .map(d => d.name)
+    .filter(n => n !== '—' && n !== '-')
+    .sort((a, b) => a.localeCompare(b, 'ru'));
+  names.forEach((name, i) => {
+    state.driverColors.set(name, DRIVER_PALETTE[i % DRIVER_PALETTE.length]);
+  });
+}
+
+// ============================================================
+// ЗАГРУЗКА ФАЙЛА
+// ============================================================
+function setupFileInputs() {
+  const onFile = (file) => {
+    if (!file) return;
+    document.getElementById('fileName').textContent = file.name;
+    loadXlsx(file);
+  };
+  document.getElementById('fileInput').addEventListener('change', e => onFile(e.target.files[0]));
+  document.getElementById('fileInput2').addEventListener('change', e => onFile(e.target.files[0]));
+
+  const empty = document.getElementById('emptyState');
+  ['dragenter','dragover'].forEach(ev => {
+    document.addEventListener(ev, e => {
+      e.preventDefault();
+      empty.classList.add('drag-over');
+    });
+  });
+  ['dragleave','drop'].forEach(ev => {
+    document.addEventListener(ev, e => {
+      e.preventDefault();
+      if (ev === 'dragleave' && e.relatedTarget) return;
+      empty.classList.remove('drag-over');
+    });
+  });
+  document.addEventListener('drop', e => {
+    const file = e.dataTransfer?.files?.[0];
+    if (file) onFile(file);
+  });
+}
+
+async function loadXlsx(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+
+  const findSheet = (keywords) => {
+    const names = wb.SheetNames;
+    for (const kw of keywords) {
+      const found = names.find(n => n.toLowerCase().includes(kw));
+      if (found) return wb.Sheets[found];
+    }
+    return null;
+  };
+
+  const wsDrivers = findSheet(['водител', 'drivers', 'сводка']) || wb.Sheets[wb.SheetNames[0]];
+  const wsDaily   = findSheet(['динамик', 'по дням', 'daily'])   || wb.Sheets[wb.SheetNames[1]];
+  const wsAll     = findSheet(['все заправки', 'все', 'details', 'all']) || wb.Sheets[wb.SheetNames[2]];
+
+  state.drivers  = parseDrivers(XLSX.utils.sheet_to_json(wsDrivers, { header: 1, raw: true, defval: null }));
+  state.daily    = parseDaily(XLSX.utils.sheet_to_json(wsDaily, { header: 1, raw: true, defval: null }));
+  state.allFills = wsAll ? parseAllFills(XLSX.utils.sheet_to_json(wsAll, { header: 1, raw: true, defval: null })) : [];
+
+  assignDriverColors();
+
+  // По умолчанию: топ-6 водителей выбраны
+  state.selectedDrivers.clear();
+  const top6 = [...state.drivers]
+    .filter(d => d.name !== '—' && d.name !== '-')
+    .sort((a, b) => b.litres - a.litres)
+    .slice(0, 6)
+    .map(d => d.name);
+  top6.forEach(n => state.selectedDrivers.add(n));
+
+  document.getElementById('emptyState').hidden = true;
+  document.getElementById('dashboard').hidden = false;
+
+  buildDriverCheckboxes();
+  setupChartControls();
+  renderAll();
+}
+
+// ============================================================
+// ПАРСИНГ ЛИСТОВ
+// ============================================================
+function parseDrivers(rows) {
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length === 0 || r[0] == null) continue;
+    const name = String(r[0]).trim();
+    if (!name) continue;
+    out.push({
+      name,
+      litres: parseNum(r[1]),
+      fills:  parseNum(r[2]),
+      avg:    parseNum(r[3]),
+      sum:    parseNum(r[4]),
+    });
+  }
+  return out;
+}
+
+function parseDaily(rows) {
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length === 0) continue;
+    const d = parseDate(r[0]);
+    if (!d) continue;
+    out.push({ date: d, litres: parseNum(r[1]), fills: parseNum(r[2]) });
+  }
+  return out;
+}
+
+function parseAllFills(rows) {
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length === 0) continue;
+    const d = parseDate(r[0]);
+    if (!d) continue;
+    out.push({
+      date: d,
+      driver: String(r[1] || '—').trim(),
+      litres: parseNum(r[2]),
+      sum: parseNum(r[3]),
+      location: String(r[4] || '').trim(),
+    });
+  }
+  return out;
+}
+
+// ============================================================
+// РЕНДЕР KPI
+// ============================================================
+function renderKPI() {
+  const totalLitres = state.drivers.reduce((s, d) => s + d.litres, 0);
+  const totalFills = state.drivers.reduce((s, d) => s + d.fills, 0);
+  const totalSum = state.drivers.reduce((s, d) => s + d.sum, 0);
+  const avgPrice = totalLitres > 0 ? totalSum / totalLitres : 0;
+
+  const na = state.drivers.find(d => d.name === '—' || d.name === '-');
+  const naLitres = na ? na.litres : 0;
+  const naShare = totalLitres > 0 ? (naLitres / totalLitres * 100) : 0;
+
+  const dates = state.daily.map(d => d.date.getTime());
+  if (dates.length) {
+    const min = new Date(Math.min(...dates));
+    const max = new Date(Math.max(...dates));
+    document.getElementById('periodHint').textContent = `${fmtDate(min)} — ${fmtDate(max)}`;
+  }
+
+  document.getElementById('kpiLitres').textContent = fmtInt(totalLitres) + ' л';
+  document.getElementById('kpiLitresSub').textContent = `${state.drivers.length} водителей в отчёте`;
+  document.getElementById('kpiFills').textContent = fmtInt(totalFills);
+  document.getElementById('kpiFillsSub').textContent = `в среднем ${fmtNum(totalLitres / (totalFills || 1), 1)} л на заправку`;
+  document.getElementById('kpiSum').textContent = fmtMoney(totalSum);
+  document.getElementById('kpiSumSub').textContent = `в среднем ${fmtMoney(totalSum / (totalFills || 1))} за заправку`;
+  document.getElementById('kpiPrice').textContent = fmtNum(avgPrice, 2) + ' ₽';
+  document.getElementById('kpiNoDriver').textContent = fmtInt(naLitres) + ' л';
+  document.getElementById('kpiNoDriverSub').textContent = `${fmtNum(naShare, 1)}% от общего объёма`;
+}
+
+// ============================================================
+// ЕДИНЫЙ СПИСОК МЕСЯЦЕВ (общий для обоих режимов)
+// ============================================================
+function getMonthKeys() {
+  const set = new Set();
+  state.daily.forEach(d => set.add(monthKey(d.date)));
+  state.allFills.forEach(f => set.add(monthKey(f.date)));
+  return Array.from(set).sort();
+}
+
+function monthKeyToLabel(k) {
+  const y = Math.floor(k / 100);
+  const m = (k % 100) - 1;
+  return fmtMonth(new Date(y, m, 1));
+}
+
+// ============================================================
+// ДИНАМИКА ПО МЕСЯЦАМ — ГЛАВНАЯ ФУНКЦИЯ
+// ============================================================
+function renderMonthlyChart() {
+  if (state.monthlyMode === 'drivers') {
+    renderMonthlyByDriver();
+  } else {
+    renderMonthlyTotal();
+  }
+}
+
+// ---------- РЕЖИМ 1: СУММАРНО ----------
+function renderMonthlyTotal() {
+  const map = new Map();
+  state.daily.forEach(d => {
+    const key = monthKey(d.date);
+    if (!map.has(key)) map.set(key, { litres: 0, fills: 0, sum: 0 });
+    const m = map.get(key);
+    m.litres += d.litres;
+    m.fills += d.fills;
+  });
+  state.allFills.forEach(f => {
+    const key = monthKey(f.date);
+    const m = map.get(key);
+    if (m) m.sum += f.sum;
+  });
+
+  const keys = Array.from(map.keys()).sort((a, b) => a - b);
+  const labels = keys.map(monthKeyToLabel);
+  const litres = keys.map(k => +map.get(k).litres.toFixed(1));
+  const sums = keys.map(k => Math.round(map.get(k).sum));
+  const prices = keys.map(k => {
+    const m = map.get(k);
+    return m.litres > 0 ? +(m.sum / m.litres).toFixed(2) : 0;
+  });
+
+  const ctx = document.getElementById('monthlyChart');
+  state.charts.monthly?.destroy();
+  state.charts.monthly = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Литры',
+          data: litres,
+          backgroundColor: 'rgba(102,126,234,0.75)',
+          borderRadius: 6,
+          yAxisID: 'y',
+          order: 2,
+        },
+        {
+          label: 'Затраты, ₽',
+          data: sums,
+          backgroundColor: 'rgba(159,122,234,0.55)',
+          borderRadius: 6,
+          yAxisID: 'y1',
+          order: 3,
+        },
+        {
+          label: 'Цена литра, ₽',
+          data: prices,
+          type: 'line',
+          borderColor: '#ED8936',
+          backgroundColor: '#ED8936',
+          borderWidth: 3,
+          tension: 0.35,
+          pointRadius: 4,
+          pointBackgroundColor: '#ED8936',
+          yAxisID: 'y2',
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y;
+              const label = ctx.dataset.label;
+              if (label.includes('Цена')) return `${label}: ${v.toFixed(2)}`;
+              if (label.includes('Затраты')) return `${label}: ${Math.round(v).toLocaleString('ru-RU')} ₽`;
+              return `${label}: ${v.toLocaleString('ru-RU')} л`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          position: 'left',
+          title: { display: true, text: 'Литры', font: { size: 11, weight: '600' }, color: '#667EEA' },
+          grid: { color: '#EDF2F7' },
+        },
+        y1: {
+          position: 'right',
+          title: { display: true, text: 'Затраты, ₽', font: { size: 11, weight: '600' }, color: '#9F7AEA' },
+          grid: { display: false },
+        },
+        y2: { position: 'right', display: false, min: 0 },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ---------- РЕЖИМ 2: ПО ВОДИТЕЛЯМ ----------
+function renderMonthlyByDriver() {
+  const monthKeys = getMonthKeys();
+  const labels = monthKeys.map(monthKeyToLabel);
+
+  // Группируем litres по (водитель, месяц)
+  const byDriver = new Map();
+  state.allFills.forEach(f => {
+    if (f.driver === '—' || f.driver === '-') return;
+    if (!byDriver.has(f.driver)) byDriver.set(f.driver, new Map());
+    const m = byDriver.get(f.driver);
+    const k = monthKey(f.date);
+    m.set(k, (m.get(k) || 0) + f.litres);
+  });
+
+  // Собираем датасеты для выбранных водителей
+  const datasets = [];
+  for (const [name, monthMap] of byDriver) {
+    if (!state.selectedDrivers.has(name)) continue;
+    const color = state.driverColors.get(name) || '#667EEA';
+    const data = monthKeys.map(k => {
+      const v = monthMap.get(k) || 0;
+      return v > 0 ? +v.toFixed(1) : null; // null — чтобы линия обрывалась вместо 0
+    });
+    datasets.push({
+      label: name,
+      data,
+      borderColor: color,
+      backgroundColor: color + '20',
+      borderWidth: 2.5,
+      tension: 0.35,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      pointBackgroundColor: color,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 1.5,
+      spanGaps: true,
+      fill: false,
+    });
+  }
+
+  const ctx = document.getElementById('monthlyChart');
+  state.charts.monthly?.destroy();
+  state.charts.monthly = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: 14,
+            padding: 12,
+            font: { size: 12 },
+            usePointStyle: true,
+            pointStyle: 'line',
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y;
+              if (v == null) return null;
+              return `${ctx.dataset.label}: ${v.toLocaleString('ru-RU')} л`;
+            },
+            footer: (items) => {
+              const total = items.reduce((s, i) => s + (i.parsed.y || 0), 0);
+              return `Итого за месяц: ${total.toLocaleString('ru-RU')} л`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Литры в месяц', font: { size: 11, weight: '600' } },
+          grid: { color: '#EDF2F7' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// ЧЕКБОКСЫ ВОДИТЕЛЕЙ
+// ============================================================
+function buildDriverCheckboxes() {
+  const container = document.getElementById('driverCheckboxes');
+  container.innerHTML = '';
+
+  // Сортируем водителей по убыванию литров
+  const names = state.drivers
+    .filter(d => d.name !== '—' && d.name !== '-')
+    .sort((a, b) => b.litres - a.litres)
+    .map(d => d.name);
+
+  names.forEach(name => {
+    const color = state.driverColors.get(name) || '#667EEA';
+    const label = document.createElement('label');
+    label.className = 'driver-cb';
+    label.innerHTML = `
+      <input type="checkbox" ${state.selectedDrivers.has(name) ? 'checked' : ''} data-driver="${name.replace(/"/g, '&quot;')}">
+      <span class="swatch" style="background:${color}"></span>
+      <span class="name">${name}</span>
+    `;
+    const cb = label.querySelector('input');
+    cb.addEventListener('change', () => {
+      if (cb.checked) state.selectedDrivers.add(name);
+      else state.selectedDrivers.delete(name);
+      renderMonthlyChart();
+    });
+    container.appendChild(label);
+  });
+}
+
+// ============================================================
+// ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМОВ
+// ============================================================
+function setupChartControls() {
+  // Кнопки режима
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      if (state.monthlyMode === mode) return;
+      state.monthlyMode = mode;
+
+      document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      document.getElementById('driverToggles').hidden = (mode !== 'drivers');
+
+      renderMonthlyChart();
+    });
+  });
+
+  // Кнопка "Все"
+  document.getElementById('btnAllDrivers').onclick = () => {
+    state.drivers
+      .filter(d => d.name !== '—' && d.name !== '-')
+      .forEach(d => state.selectedDrivers.add(d.name));
+    buildDriverCheckboxes();
+    renderMonthlyChart();
+  };
+
+  // Кнопка "Топ-6"
+  document.getElementById('btnTopDrivers').onclick = () => {
+    state.selectedDrivers.clear();
+    state.drivers
+      .filter(d => d.name !== '—' && d.name !== '-')
+      .sort((a, b) => b.litres - a.litres)
+      .slice(0, 6)
+      .forEach(d => state.selectedDrivers.add(d.name));
+    buildDriverCheckboxes();
+    renderMonthlyChart();
+  };
+
+  // Кнопка "Ничего"
+  document.getElementById('btnNoneDrivers').onclick = () => {
+    state.selectedDrivers.clear();
+    buildDriverCheckboxes();
+    renderMonthlyChart();
+  };
+}
+
+// ============================================================
+// ГРАФИК: ТОП-10 ВОДИТЕЛЕЙ
+// ============================================================
+function renderDrivers() {
+  const top = [...state.drivers]
+    .filter(d => d.name !== '—' && d.name !== '-')
+    .sort((a, b) => b.litres - a.litres)
+    .slice(0, 10)
+    .reverse();
+
+  const labels = top.map(d => d.name);
+  const values = top.map(d => +d.litres.toFixed(1));
+
+  // Цвета берём из общей палитры водителей — чтобы совпадало с линиями
+  const colors = top.map(d => (state.driverColors.get(d.name) || '#667EEA') + 'cc');
+
+  const ctx = document.getElementById('driversChart');
+  state.charts.drivers?.destroy();
+  state.charts.drivers = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Литры', data: values, backgroundColor: colors, borderRadius: 8 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const d = top[ctx.dataIndex];
+              return [
+                `${d.litres.toLocaleString('ru-RU')} л`,
+                `${d.fills} заправок`,
+                `средний объём ${d.avg.toFixed(1)} л`,
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Литры', font: { size: 11 } },
+          grid: { color: '#EDF2F7' }
+        },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// ГРАФИК: ДНИ НЕДЕЛИ
+// ============================================================
+function renderWeekday() {
+  const names = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const litres = [0,0,0,0,0,0,0];
+  const fills  = [0,0,0,0,0,0,0];
+  state.daily.forEach(d => {
+    const dow = (d.date.getDay() + 6) % 7;
+    litres[dow] += d.litres;
+    fills[dow]  += d.fills;
+  });
+
+  const ctx = document.getElementById('weekdayChart');
+  state.charts.weekday?.destroy();
+  state.charts.weekday = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: names,
+      datasets: [{
+        label: 'Литры',
+        data: litres.map(v => +v.toFixed(1)),
+        backgroundColor: litres.map((_, i) =>
+          (i === 5 || i === 6) ? 'rgba(237,137,54,0.75)' : 'rgba(102,126,234,0.75)'
+        ),
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => [`${ctx.parsed.y.toLocaleString('ru-RU')} л`, `${fills[ctx.dataIndex]} заправок`]
+          }
+        }
+      },
+      scales: {
+        y: {
+          title: { display: true, text: 'Литры', font: { size: 11 } },
+          grid: { color: '#EDF2F7' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// ГРАФИК: ПИРОГ ПО ВОДИТЕЛЯМ
+// ============================================================
+function renderPie() {
+  const filtered = state.drivers.filter(d => d.name !== '—' && d.name !== '-');
+  const top = filtered.sort((a, b) => b.litres - a.litres).slice(0, 9);
+  const otherLitres = filtered.slice(9).reduce((s, d) => s + d.litres, 0);
+  const na = state.drivers.find(d => d.name === '—' || d.name === '-');
+
+  const labels = top.map(d => d.name);
+  const values = top.map(d => +d.litres.toFixed(1));
+  const colors = top.map(d => state.driverColors.get(d.name) || '#667EEA');
+
+  if (otherLitres > 0) { labels.push('Прочие'); values.push(+otherLitres.toFixed(1)); colors.push('#CBD5E0'); }
+  if (na && na.litres > 0) { labels.push('Без водителя'); values.push(+na.litres.toFixed(1)); colors.push('#F56565'); }
+
+  const ctx = document.getElementById('pieChart');
+  state.charts.pie?.destroy();
+  state.charts.pie = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const total = values.reduce((a, b) => a + b, 0);
+              const pct = (ctx.parsed / total * 100).toFixed(1);
+              return `${ctx.label}: ${ctx.parsed.toLocaleString('ru-RU')} л (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// ГРАФИК: SCATTER
+// ============================================================
+function renderScatter() {
+  const filtered = state.drivers.filter(d => d.name !== '—' && d.name !== '-');
+  const points = filtered.map(d => ({ x: d.fills, y: d.avg, name: d.name }));
+
+  const ctx = document.getElementById('scatterChart');
+  state.charts.scatter?.destroy();
+  state.charts.scatter = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Водители',
+        data: points,
+        backgroundColor: points.map(p => (state.driverColors.get(p.name) || '#667EEA') + 'b3'),
+        borderColor: points.map(p => state.driverColors.get(p.name) || '#667EEA'),
+        borderWidth: 2,
+        pointRadius: 7,
+        pointHoverRadius: 10,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const p = ctx.raw;
+              return [p.name, `Заправок: ${p.x}`, `Средний объём: ${p.y.toFixed(1)} л`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Количество заправок', font: { size: 11, weight: '600' } },
+          grid: { color: '#EDF2F7' }
+        },
+        y: {
+          title: { display: true, text: 'Средний объём, л', font: { size: 11, weight: '600' } },
+          grid: { color: '#EDF2F7' }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// ТАБЛИЦА
+// ============================================================
+function renderTable() {
+  const totalLitres = state.drivers.reduce((s, d) => s + d.litres, 0);
+  const rows = state.drivers.map(d => ({
+    ...d,
+    price: d.litres > 0 ? d.sum / d.litres : 0,
+    share: totalLitres > 0 ? d.litres / totalLitres * 100 : 0,
+  }));
+
+  rows.sort((a, b) => {
+    const aV = a[state.sortKey], bV = b[state.sortKey];
+    const cmp = typeof aV === 'string' ? aV.localeCompare(bV) : aV - bV;
+    return state.sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const tbody = document.getElementById('driversTbody');
+  tbody.innerHTML = '';
+
+  const ranks = [...rows]
+    .filter(r => r.name !== '—' && r.name !== '-')
+    .sort((a, b) => b.litres - a.litres)
+    .map(r => r.name);
+  const rankMap = new Map(ranks.map((n, i) => [n, i + 1]));
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const isNA = r.name === '—' || r.name === '-';
+    const rank = rankMap.get(r.name);
+    let medal = '';
+    if (rank === 1) medal = 'gold';
+    else if (rank === 2) medal = 'silver';
+    else if (rank === 3) medal = 'bronze';
+
+    tr.innerHTML = `
+      <td>
+        <div class="name-cell">
+          ${rank ? `<span class="rank ${medal}">${rank}</span>` : ''}
+          <span>${isNA ? 'Без водителя' : r.name}</span>
+          ${isNA ? '<span class="badge-na">нет данных</span>' : ''}
+        </div>
+      </td>
+      <td class="num">${fmtNum(r.litres, 1)}</td>
+      <td class="num">${r.fills}</td>
+      <td class="num">${fmtNum(r.avg, 1)} л</td>
+      <td class="num">${fmtInt(r.sum)}</td>
+      <td class="num">${fmtNum(r.price, 2)}</td>
+      <td class="num">${fmtNum(r.share, 1)}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.querySelectorAll('#driversTable th').forEach(th => {
+    th.onclick = () => {
+      const key = th.dataset.sort;
+      if (state.sortKey === key) {
+        state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sortKey = key;
+        state.sortDir = (key === 'name') ? 'asc' : 'desc';
+      }
+      renderTable();
+    };
+  });
+}
+
+// ============================================================
+// ОБЩИЙ РЕНДЕР
+// ============================================================
+function renderAll() {
+  renderKPI();
+  renderMonthlyChart();
+  renderDrivers();
+  renderWeekday();
+  renderPie();
+  renderScatter();
+  renderTable();
+}
+
+// ============================================================
+// СТАРТ
+// ============================================================
+setupFileInputs();
+</script>
+</body>
+</html>
